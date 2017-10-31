@@ -265,6 +265,23 @@ func (g *grpc) generateSerializedAPI(servName string, method *pb.MethodDescripto
     }
     g.P("// @protopy")
     g.P(fmt.Sprintf("func %s(serialized%s []byte) (serialized%s []byte, err error) {", methName, g.typeName(method.GetInputType()), g.typeName(method.GetOutputType())))
+    g.P(fmt.Sprintf("    var input %s", g.typeName(method.GetInputType())))
+    g.P(fmt.Sprintf("    err = input.Unmarshall(serialized%s)", g.typeName(method.GetInputType())))
+    g.P(fmt.Sprintf("    if err != nil {"))
+    g.P(fmt.Sprintf("        return"))
+    g.P(fmt.Sprintf("    }"))
+    g.P(fmt.Sprintf("    output, err := %s.%s(input)", grpcPkg, methName))
+    g.P(fmt.Sprintf("    serialized%s, err = output.Marshall()", g.typeName(method.GetOutputType())))
+
+    // var input InputType
+    // err = input.Unmarshall(serializedInputType)
+    // if err != nil {
+    //     return
+    // }
+    // output, err := grpcPkg.methName(input)
+    // serializedOutputType, err = output.Marshall()
+
+
     g.P("    return")
     g.P("}")
     g.P()
