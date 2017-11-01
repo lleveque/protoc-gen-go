@@ -141,23 +141,23 @@ func (g *grpcserial) generateService(file *generator.FileDescriptor, service *pb
 
     g.P("/* Example implementation of ", servName, " service :")
     g.P()
-    g.P("package your_package")
+    g.P("package your_package // TODO change to your project package name")
     g.P()
     g.P("import \"github.com/golang/protobuf/proto\"")
-    g.P(fmt.Sprintf("import \"%s\"", goPackage))
+    g.P(fmt.Sprintf("import pb \"%s\" // TODO change to the Go package in which your .pb.go has been generated", goPackage))
     g.P()
     g.P("//go:generate goprotopy $GOPACKAGE $GOFILE")
     g.P()
 
     for i, method := range service.Method {
         g.gen.PrintComments(fmt.Sprintf("%s,2,%d", path, i)) // 2 means method in a service.
-        g.generateSerializedAPI(goPackage, servName, method)
+        g.generateSerializedAPI(servName, method)
     }
     g.P("*/")
     g.P()
 }
 
-func (g *grpcserial) generateSerializedAPI(goPackage string, servName string, method *pb.MethodDescriptorProto) {
+func (g *grpcserial) generateSerializedAPI(servName string, method *pb.MethodDescriptorProto) {
     origMethodName := method.GetName()
     methodName := generator.CamelCase(origMethodName)
 
@@ -170,12 +170,16 @@ func (g *grpcserial) generateSerializedAPI(goPackage string, servName string, me
     g.P(fmt.Sprintf("// output is a serialized protobuf object of type %s", outputTypeName))
     g.P("// @protopy")
     g.P(fmt.Sprintf("func %s(input []byte) (output []byte, err error) {", methodName))
-    g.P(fmt.Sprintf("    %s := new(%s.%s)", inputVarName, goPackage, inputTypeName))
+    g.P(fmt.Sprintf("    %s := new(pb.%s)", inputVarName, inputTypeName))
     g.P(fmt.Sprintf("    err = proto.Unmarshal(input, %s)", inputVarName))
     g.P("    if err != nil {")
     g.P("        return")
     g.P("    }")
-    g.P(fmt.Sprintf("    %s, err := your%sImplementation(%s)", outputVarName, methodName, inputVarName))
+    g.P()
+    g.P(fmt.Sprintf("    // TODO : implement %s(%s *pb.%s) (*pb.%s, error)", methodName, inputVarName, inputTypeName, outputTypeName))
+    g.P(fmt.Sprintf("    // %s, err := your%sImplementation(%s)", outputVarName, methodName, inputVarName))
+    g.P()
+    g.P(fmt.Sprintf("    %s := new(pb.%s)", outputVarName, outputTypeName))
     g.P(fmt.Sprintf("    output, err = proto.Marshal(%s)", outputVarName))
     g.P("    return")
     g.P("}")
