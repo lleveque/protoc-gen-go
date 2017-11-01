@@ -163,8 +163,11 @@ func (g *grpcserial) generateSerializedAPI(goPackage string, servName string, me
 
     inputTypeName := g.typeName(method.GetInputType())
     inputVarName := unexport(inputTypeName)
-    outputVarName := unexport(g.typeName(method.GetOutputType()))
+    outputTypeName := g.typeName(method.GetOutputType())
+    outputVarName := unexport(outputTypeName)
     
+    g.P(fmt.Sprintf("// input is a serialized protobuf object of type %s", inputTypeName))
+    g.P(fmt.Sprintf("// output is a serialized protobuf object of type %s", outputTypeName))
     g.P("// @protopy")
     g.P(fmt.Sprintf("func %s(input []byte) (output []byte, err error) {", methodName))
     g.P(fmt.Sprintf("    %s := new(%s.%s)", inputVarName, goPackage, inputTypeName))
