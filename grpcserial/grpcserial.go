@@ -143,10 +143,69 @@ var reservedClientName = map[string]bool{
 
 func unexport(s string) string { return strings.ToLower(s[:1]) + s[1:] }
 
+// baseName returns the last path element of the name, with the last dotted suffix removed.
+func baseName(name string) string {
+    // First, find the last element
+    if i := strings.LastIndex(name, "/"); i >= 0 {
+        name = name[i+1:]
+    }
+    // Now drop the suffix
+    if i := strings.LastIndex(name, "."); i >= 0 {
+        name = name[0:i]
+    }
+    return name
+}
+
+// goPackageOption interprets the file's go_package option.
+// If there is no go_package, it returns ("", "", false).
+// If there's a simple name, it returns ("", pkg, true).
+// If the option implies an import path, it returns (impPath, pkg, true).
+func goPackageOption(d *generator.FileDescriptor) (impPath, pkg string, ok bool) {
+    pkg = d.GetOptions().GetGoPackage()
+    if pkg == "" {
+        return
+    }
+    ok = true
+    // The presence of a slash implies there's an import path.
+    slash := strings.LastIndex(pkg, "/")
+    if slash < 0 {
+        return
+    }
+    impPath, pkg = pkg, pkg[slash+1:]
+    // A semicolon-delimited suffix overrides the package name.
+    sc := strings.IndexByte(impPath, ';')
+    if sc < 0 {
+        return
+    }
+    impPath, pkg = impPath[:sc], impPath[sc+1:]
+    return
+}
+
+// goPackageName returns the Go package name to use in the
+// generated Go file.  The result explicit reports whether the name
+// came from an option go_package statement.  If explicit is false,
+// the name was derived from the protocol buffer's package statement
+// or the input file name.
+func goPackageName(d *generator.FileDescriptor) (name string, explicit bool) {
+    // Does the file have a "go_package" option?
+    if _, pkg, ok := goPackageOption(d); ok {
+        return pkg, true
+    }
+
+    // Does the file have a package clause?
+    if pkg := d.GetPackage(); pkg != "" {
+        return pkg, false
+    }
+    // Use the file base name.
+    return baseName(d.GetName()), false
+}
+
 // generateService generates all the code for the named service.
 func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.ServiceDescriptorProto, index int) {
     path := fmt.Sprintf("6,%d", index) // 6 means service.
-
+    
+    goPackage, _ := goPackageName(file)
+    
     origServName := service.GetName()
     fullServName := origServName
     if pkg := file.GetPackage(); pkg != "" {
@@ -154,15 +213,21 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
     }
     servName := generator.CamelCase(origServName)
 
-    g.P("//go:generate goprotopy $GOPACKAGE $GOFILE")
+    g.P("/* Example implementation of ", servName, " service :")
     g.P()
-    g.P("// Serialized API for ", servName, " service")
+    g.P("package your_package")
+    g.P()
+    g.P("import \"github.com/golang/protobuf/proto\"")
+    g.P(fmt.Sprintf("import \"%s\"", goPackage))
+    g.P()
+    g.P("//go:generate goprotopy $GOPACKAGE $GOFILE")
     g.P()
 
     for i, method := range service.Method {
         g.gen.PrintComments(fmt.Sprintf("%s,2,%d", path, i)) // 2 means method in a service.
-        g.generateSerializedAPI(servName, method)
+        g.generateSerializedAPI(goPackage, servName, method)
     }
+    g.P("*/")
     g.P()
 
     // // Client structure.
@@ -257,31 +322,25 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
     g.P()
 }
 
-func (g *grpc) generateSerializedAPI(servName string, method *pb.MethodDescriptorProto) {
-    origMethName := method.GetName()
-    methName := generator.CamelCase(origMethName)
-    if reservedClientName[methName] {
-        methName += "_"
+func (g *grpc) generateSerializedAPI(goPackage string, servName string, method *pb.MethodDescriptorProto) {
+    origMethodName := method.GetName()
+    methodName := generator.CamelCase(origMethodName)
+    if reservedClientName[methodName] {
+        methodName += "_"
     }
+    inputTypeName := g.typeName(method.GetInputType())
+    inputVarName := unexport(inputTypeName)
+    outputVarName := unexport(g.typeName(method.GetOutputType()))
+    
     g.P("// @protopy")
-    g.P(fmt.Sprintf("func %s(serialized%s []byte) (serialized%s []byte, err error) {", methName, g.typeName(method.GetInputType()), g.typeName(method.GetOutputType())))
-    g.P(fmt.Sprintf("    var input %s", g.typeName(method.GetInputType())))
-    g.P(fmt.Sprintf("    err = input.Unmarshall(serialized%s)", g.typeName(method.GetInputType())))
-    g.P(fmt.Sprintf("    if err != nil {"))
-    g.P(fmt.Sprintf("        return"))
-    g.P(fmt.Sprintf("    }"))
-    g.P(fmt.Sprintf("    output, err := %s.%s(input)", grpcPkg, methName))
-    g.P(fmt.Sprintf("    serialized%s, err = output.Marshall()", g.typeName(method.GetOutputType())))
-
-    // var input InputType
-    // err = input.Unmarshall(serializedInputType)
-    // if err != nil {
-    //     return
-    // }
-    // output, err := grpcPkg.methName(input)
-    // serializedOutputType, err = output.Marshall()
-
-
+    g.P(fmt.Sprintf("func %s(input []byte) (output []byte, err error) {", methodName))
+    g.P(fmt.Sprintf("    %s := new(%s.%s)", inputVarName, goPackage, inputTypeName))
+    g.P(fmt.Sprintf("    err = proto.Unmarshal(input, %s)", inputVarName))
+    g.P("    if err != nil {")
+    g.P("        return")
+    g.P("    }")
+    g.P(fmt.Sprintf("    %s, err := your%sImplementation(%s)", outputVarName, methodName, inputVarName))
+    g.P(fmt.Sprintf("    output, err = proto.Marshal(%s)", outputVarName))
     g.P("    return")
     g.P("}")
     g.P()
