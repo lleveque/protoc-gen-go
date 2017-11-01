@@ -54,6 +54,8 @@ import (
 
     "github.com/golang/protobuf/proto"
     "github.com/golang/protobuf/protoc-gen-go/generator"
+
+    // This is to show how to register grpcserial plugin in protoc-gen-go : simply import it !
     _ "github.com/lleveque/protoc-gen-go/grpcserial"
 )
 
