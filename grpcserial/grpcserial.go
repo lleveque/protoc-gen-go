@@ -146,7 +146,8 @@ func (g *grpcserial) generateService(file *generator.FileDescriptor, service *pb
     g.P("import \"github.com/golang/protobuf/proto\"")
     g.P(fmt.Sprintf("import pb \"%s\" // TODO change to the Go package in which your .pb.go has been generated", goPackage))
     g.P()
-    g.P("//go:generate goprotopy $GOFILE")
+    g.P("// TODO change packagePath value to match your package full import path")
+    g.P("//go:generate goprotopy --packagePath=your_org/your_name/your_package $GOFILE")
     g.P()
 
     for i, method := range service.Method {
