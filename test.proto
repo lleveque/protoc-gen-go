@@ -1,0 +1,32 @@
+syntax = "proto2";
+
+package greeting;
+
+message HelloRequest {
+  required string name = 1;
+  required int32 age = 2;
+}
+
+// This is a greeting response
+message HelloResponse {
+  required string greeting = 1;
+  required bool seenYet = 2;
+}
+
+message GoodbyeRequest {
+  required string name = 1;
+}
+
+message GoodbyeResponse {
+  required string byebyeGreeting = 1;
+}
+
+service Greet {
+  // Hello returns a greeting to a person with an age,
+  // and whether this person had previously been seen or not
+  rpc Hello(HelloRequest) returns (HelloResponse) {}
+
+  // Goodbye returns a byebye greeting to anyone
+  rpc Goodbye(GoodbyeRequest) returns (GoodbyeResponse) {}
+}
+
